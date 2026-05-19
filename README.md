@@ -1,13 +1,13 @@
 # Generative CRUD Expense Tracker
 
-A full-stack MERN expense tracker that uploads receipt images, analyzes them with a backend-only Groq API key, stores extracted expense details in MongoDB, and supports complete CRUD operations.
+A full-stack MERN expense tracker that uploads receipt images, analyzes them with a backend-only Gemini API key, stores extracted expense details in MongoDB, and supports complete CRUD operations.
 
 ## Tech Stack
 
 - React.js, Axios, React hooks, Vite
 - Node.js, Express.js, MongoDB, Mongoose
 - Multer uploads, CORS, dotenv
-- Backend-only Groq AI image analysis
+- Backend-only Gemini AI image analysis with the Google Gen AI SDK
 
 ## Project Structure
 
@@ -75,9 +75,9 @@ cp .env.example .env
 
 ```env
 MONGO_URI=mongodb://127.0.0.1:27017/gen-crud-expense-tracker
-GROQ_API_KEY=your_groq_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
 PORT=5000
-GROQ_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
+GEMINI_MODEL=gemini-2.5-flash
 CLIENT_URL=http://localhost:5173
 ```
 
@@ -108,7 +108,7 @@ Frontend: `http://localhost:5173`
 1. The user selects a receipt image in the React dashboard.
 2. React sends the file to `POST /api/expenses/analyze` using `multipart/form-data`.
 3. Multer validates that the upload is an image and stores it in `backend/uploads`.
-4. The backend converts the image to a base64 data URL and sends it to Groq's OpenAI-compatible chat completions endpoint.
+4. The backend converts the image to base64 inline image data and sends it to Gemini through the Google Gen AI SDK.
 5. The AI is instructed to return structured JSON only:
 
 ```json
@@ -129,9 +129,8 @@ Frontend: `http://localhost:5173`
 
 ## Notes
 
-- The Groq API key is never sent to React.
-- If `GROQ_API_KEY` is missing, uploads still create a draft expense using fallback values so the CRUD workflow remains testable.
-- Use a Groq vision model for receipt images. The default is `meta-llama/llama-4-scout-17b-16e-instruct`.
-- Upload receipt images smaller than 3MB so the base64 image stays within Groq's request limit.
+- The Gemini API key is never sent to React.
+- Use a Gemini vision-capable model for receipt images. The default is `gemini-2.5-flash`.
+- Upload receipt images smaller than 3MB so image analysis stays fast and reliable.
 - Uploaded files are served from `/uploads`.
 - Deleting an expense also deletes its uploaded image from disk.

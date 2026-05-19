@@ -1,8 +1,8 @@
 import fs from 'fs/promises';
+import { GoogleGenAI } from '@google/genai';
 import { EXPENSE_CATEGORIES } from '../models/Expense.js';
 
-const GROQ_CHAT_COMPLETIONS_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const DEFAULT_GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+const DEFAULT_GEMINI_VISION_MODEL = 'gemini-2.5-flash';
 
 const detectMimeType = (buffer, fallbackMimeType) => {
   if (buffer.length >= 12) {
@@ -112,27 +112,12 @@ const normalizeExpense = (data) => {
   };
 };
 
-const parseGroqError = async (response) => {
-  const errorText = await response.text();
-
-  try {
-    const parsedError = JSON.parse(errorText);
-    return parsedError?.error?.message || parsedError?.message || errorText;
-  } catch {
-    return errorText;
-  }
-};
-
 export const analyzeReceiptImage = async (filePath, uploadedMimeType) => {
-  const apiKey = process.env.GROQ_API_KEY;
-  const model = process.env.GROQ_MODEL || DEFAULT_GROQ_VISION_MODEL;
+  const apiKey = process.env.GEMINI_API_KEY;
+  const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_VISION_MODEL;
 
-  if (!apiKey || apiKey === 'your_groq_api_key_here') {
-    throw new Error('GROQ_API_KEY is missing. Add your Groq API key in backend/.env.');
-  }
-
-  if (!model.includes('vision') && !model.includes('llama-4')) {
-    throw new Error(`Configured Groq model "${model}" is not a vision-capable model.`);
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is missing. Add your Gemini API key in backend/.env.');
   }
 
   let fileStats;
@@ -147,7 +132,6 @@ export const analyzeReceiptImage = async (filePath, uploadedMimeType) => {
 
   const detectedMimeType = detectMimeType(imageBuffer, uploadedMimeType);
   const base64Image = imageBuffer.toString('base64');
-  const imageDataUrl = `data:${detectedMimeType};base64,${base64Image}`;
 
   console.log('[AI Upload Debug]', {
     filePath,
@@ -158,48 +142,45 @@ export const analyzeReceiptImage = async (filePath, uploadedMimeType) => {
     model
   });
 
-  const response = await fetch(GROQ_CHAT_COMPLETIONS_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
+  const ai = new GoogleGenAI({ apiKey });
+
+  let response;
+  try {
+    response = await ai.models.generateContent({
       model,
-      messages: [
+      contents: [
         {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: buildPrompt()
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: imageDataUrl
-              }
-            }
-          ]
+          inlineData: {
+            mimeType: detectedMimeType,
+            data: base64Image
+          }
+        },
+        {
+          text: buildPrompt()
         }
       ],
-      temperature: 0,
-      max_completion_tokens: 700,
-      response_format: {
-        type: 'json_object'
+      config: {
+        temperature: 0,
+        responseMimeType: 'application/json'
       }
-    })
-  });
+    });
+  } catch (error) {
+    console.error('[AI Error]', error);
+    const errorMessage = `Gemini receipt analysis failed: ${error.message}`;
+    const aiError = new Error(errorMessage);
 
-  if (!response.ok) {
-    const message = await parseGroqError(response);
-    console.error('[AI Error]', message);
-    throw new Error(`Groq receipt analysis failed: ${message}`);
+    if (
+      error.code === 403 ||
+      typeof error.message === 'string' &&
+      error.message.toLowerCase().includes('permission_denied')
+    ) {
+      aiError.statusCode = 403;
+    }
+
+    throw aiError;
   }
 
-  const result = await response.json();
-  const rawText = result?.choices?.[0]?.message?.content;
-
+  const rawText = response.text;
   console.log('[AI Raw Response]', rawText);
 
   let parsedJson;

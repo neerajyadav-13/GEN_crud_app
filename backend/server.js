@@ -6,12 +6,13 @@ import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
 import expenseRoutes from './routes/expenseRoutes.js';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 await connectDB();
 
@@ -33,7 +34,7 @@ app.use((err, req, res, next) => {
   console.error(err);
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({
-      message: 'Receipt image is too large. Please upload an image smaller than 3MB for Groq vision analysis.'
+      message: 'Receipt image is too large. Please upload an image smaller than 3MB for Gemini vision analysis.'
     });
   }
 
