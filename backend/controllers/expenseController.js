@@ -27,7 +27,7 @@ const buildExpensePayload = (payload) => ({
 });
 
 const deleteUploadedFile = async (imageUrl) => {
-  if (!imageUrl) return;
+  if (!imageUrl || imageUrl.startsWith('data:')) return;
 
   const filename = path.basename(imageUrl);
   const filePath = path.join(uploadsDir, filename);
@@ -67,8 +67,7 @@ const validateExpensePayload = (payload) => {
 const logUploadedReceipt = (file) => {
   console.log('[Receipt Upload]', {
     originalName: file.originalname,
-    filename: file.filename,
-    path: file.path,
+    filename: file.filename || null,
     mimeType: file.mimetype,
     sizeBytes: file.size
   });
@@ -82,11 +81,18 @@ export const uploadExpense = asyncHandler(async (req, res) => {
 
   logUploadedReceipt(req.file);
 
+  const imageUrl = req.file.buffer
+    ? `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`
+    : buildImageUrl(req.file.filename);
+
   try {
-    const extractedData = await analyzeReceiptImage(req.file.path, req.file.mimetype);
+    const extractedData = await analyzeReceiptImage({
+      imageBuffer: req.file.buffer,
+      uploadedMimeType: req.file.mimetype
+    });
     const expense = await Expense.create({
       ...extractedData,
-      imageUrl: buildImageUrl(req.file.filename)
+      imageUrl
     });
 
     res.status(201).json({
@@ -94,7 +100,7 @@ export const uploadExpense = asyncHandler(async (req, res) => {
       expense
     });
   } catch (error) {
-    await deleteUploadedFile(buildImageUrl(req.file.filename));
+    await deleteUploadedFile(imageUrl);
     throw error;
   }
 });
@@ -107,19 +113,26 @@ export const analyzeExpense = asyncHandler(async (req, res) => {
 
   logUploadedReceipt(req.file);
 
+  const imageUrl = req.file.buffer
+    ? `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`
+    : buildImageUrl(req.file.filename);
+
   try {
-    const extractedData = await analyzeReceiptImage(req.file.path, req.file.mimetype);
+    const extractedData = await analyzeReceiptImage({
+      imageBuffer: req.file.buffer,
+      uploadedMimeType: req.file.mimetype
+    });
 
     res.json({
       message: 'Receipt analyzed successfully',
       expense: {
         ...extractedData,
-        imageUrl: buildImageUrl(req.file.filename),
+        imageUrl,
         isDraft: true
       }
     });
   } catch (error) {
-    await deleteUploadedFile(buildImageUrl(req.file.filename));
+    await deleteUploadedFile(imageUrl);
     throw error;
   }
 });
@@ -136,7 +149,9 @@ export const createExpense = asyncHandler(async (req, res) => {
     throw new Error(errors.join(', '));
   }
 
-  const imageUrl = buildImageUrl(path.basename(req.body.imageUrl));
+  const imageUrl = req.body.imageUrl.startsWith('http') || req.body.imageUrl.startsWith('data:')
+    ? req.body.imageUrl
+    : buildImageUrl(path.basename(req.body.imageUrl));
   const expense = await Expense.create({
     ...buildExpensePayload(req.body),
     imageUrl

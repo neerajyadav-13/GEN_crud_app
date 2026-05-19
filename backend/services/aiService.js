@@ -112,7 +112,7 @@ const normalizeExpense = (data) => {
   };
 };
 
-export const analyzeReceiptImage = async (filePath, uploadedMimeType) => {
+export const analyzeReceiptImage = async ({ filePath, imageBuffer, uploadedMimeType }) => {
   const apiKey = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_VISION_MODEL;
 
@@ -120,24 +120,28 @@ export const analyzeReceiptImage = async (filePath, uploadedMimeType) => {
     throw new Error('GEMINI_API_KEY is missing. Add your Gemini API key in backend/.env.');
   }
 
-  let fileStats;
-  let imageBuffer;
+  let buffer;
 
-  try {
-    fileStats = await fs.stat(filePath);
-    imageBuffer = await fs.readFile(filePath);
-  } catch {
-    throw new Error(`Uploaded receipt image could not be read from path: ${filePath}`);
+  if (imageBuffer) {
+    buffer = imageBuffer;
+  } else if (filePath) {
+    try {
+      buffer = await fs.readFile(filePath);
+    } catch {
+      throw new Error(`Uploaded receipt image could not be read from path: ${filePath}`);
+    }
+  } else {
+    throw new Error('No receipt image provided for analysis');
   }
 
-  const detectedMimeType = detectMimeType(imageBuffer, uploadedMimeType);
-  const base64Image = imageBuffer.toString('base64');
+  const detectedMimeType = detectMimeType(buffer, uploadedMimeType);
+  const base64Image = buffer.toString('base64');
 
   console.log('[AI Upload Debug]', {
     filePath,
     uploadedMimeType,
     detectedMimeType,
-    fileSizeBytes: fileStats.size,
+    fileSizeBytes: buffer.length,
     base64Length: base64Image.length,
     model
   });

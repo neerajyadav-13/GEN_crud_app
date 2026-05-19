@@ -12,6 +12,8 @@ A full-stack MERN expense tracker that uploads receipt images, analyzes them wit
 ## Project Structure
 
 ```text
+api/
+  index.js
 backend/
   server.js
   .env.example
@@ -21,7 +23,6 @@ backend/
   controllers/expenseController.js
   middleware/uploadMiddleware.js
   services/aiService.js
-  uploads/
 frontend/
   vite.config.js
   src/
@@ -90,6 +91,24 @@ npm run dev
 Backend: `http://localhost:5000`
 
 Frontend: `http://localhost:5173`
+
+## Vercel Deployment
+
+This repository is now configured to deploy the React frontend and the serverless backend together on Vercel.
+
+1. Add the required environment variables in the Vercel dashboard:
+   - `MONGO_URI`
+   - `GEMINI_API_KEY`
+   - `GEMINI_MODEL`
+   - `CLIENT_URL`
+   - `LANGSMITH_TRACING`
+   - `LANGSMITH_ENDPOINT`
+   - `LANGSMITH_API_KEY`
+   - `LANGSMITH_PROJECT`
+
+2. Deploy using the Vercel CLI or GitHub integration.
+
+3. The frontend will be served as the static app and `/api/expenses` will be handled by the serverless backend API.
 
 ## API Routes
 
